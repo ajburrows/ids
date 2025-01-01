@@ -4,10 +4,9 @@ from datetime import datetime
 import os
 import json
 
-#TODO: move conn_attempts to its own file as a json obj
-conn_attempts = {}
 
 LOG_FILE = 'traffic.log'
+CONN_ATTEMPTS_FILE = 'connection_attempts.json'
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 def get_timestamps():
@@ -31,19 +30,16 @@ def log_packet(packet):
         print(log_entry)
         logging.info(log_entry)
 
-        log_key = (src_ip)
-        if log_key not in conn_attempts:
-            conn_attempts[log_key] = [conn_attempts.get(log_key, 0) + 1, secTime]
-        elif log_key in conn_attempts and conn_attempts[secTime - log_key][1] < 5:
-            conn_attempts[log_key][0] += 1
-            logging.warning(f'consecutive attempts')
-        else:
-            conn_attempts[log_key][0] += 1
-        
-        print()
-        print(conn_attempts)
-        print()
-    
+        conn_attempts_obj = {}
+        if os.path.exits(CONN_ATTEMPTS_FILE) and src_ip != '10.0.2.15':
+            with open(CONN_ATTEMPTS_FILE, 'r') as file:
+                conn_attempts_obj = json.load(file)
+            conn_attempts_obj[src_ip] = conn_attempts_obj.get(src_ip, 0) + 1
+            with open(CONN_ATTEMPTS_FILE, 'w') as file:
+                json.dump(conn_attempts_obj, file)
+
+        if conn_attempts_obj[src_ip] > 2:
+            logging.warning(f'ip {src_ip} has sent more than 2 connection requests')    
 
     except Exception as e:
         logging.error(f'Error processing packet: {e}')
