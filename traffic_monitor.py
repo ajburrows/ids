@@ -6,7 +6,7 @@ import json
 
 
 LOG_FILE = 'traffic.log'
-CONN_ATTEMPTS_FILE = 'connection_attempts.json'
+CONN_ATTEMPTS_FILE = "connection_attempts.json"
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 def get_timestamps():
@@ -31,9 +31,10 @@ def log_packet(packet):
         logging.info(log_entry)
 
         conn_attempts_obj = {}
-        if os.path.exits(CONN_ATTEMPTS_FILE) and src_ip != '10.0.2.15':
+        if os.path.exists(CONN_ATTEMPTS_FILE):
             with open(CONN_ATTEMPTS_FILE, 'r') as file:
                 conn_attempts_obj = json.load(file)
+            print(f'conn_attemps_obj: {conn_attempts_obj}')
             conn_attempts_obj[src_ip] = conn_attempts_obj.get(src_ip, 0) + 1
             with open(CONN_ATTEMPTS_FILE, 'w') as file:
                 json.dump(conn_attempts_obj, file)
