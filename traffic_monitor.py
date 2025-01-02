@@ -30,6 +30,7 @@ def log_packet(packet):
         print(log_entry)
         logging.info(log_entry)
 
+        give_warning = False
         conn_attempts_obj = {}
         if os.path.exists(CONN_ATTEMPTS_FILE):
             # load the current conn_attempts_obj
@@ -38,14 +39,21 @@ def log_packet(packet):
 
         # up date the obj with the new log
         if src_ip not in conn_attempts_obj:
-            conn_attempts_obj[src_ip] = [0, deque([timestamp_val])]
+            conn_attempts_obj[src_ip] = [0, [str(timestamp_val)]]
         else:
-            conn_attempts_obj[src_ip][0] = conn_attempts_obj.get(src_ip)[0]+1
+            conn_attempts_obj[src_ip][0] = conn_attempts_obj[src_ip][0]+1
+            prev_attempts = deque(conn_attempts_obj[src_ip][1])
+            prev_attempts.append(str(timestamp_val))
+            conn_attempts_obj[src_ip][1] = list(prev_attempts)
+            if len(prev_attempts) > CONN_ATTEMPT_THRESHOLD:
+                prev_attempts.popleft()
+                give_warning = True
+            
         with open(CONN_ATTEMPTS_FILE, 'w') as file:
             json.dump(conn_attempts_obj, file)
 
-        if conn_attempts_obj[src_ip] > 2:
-            logging.warning(f'ip {src_ip} has sent more than 2 connection requests')    
+        if give_warning:
+            logging.warning(f'ip {src_ip} has sent more than {CONN_ATTEMPT_THRESHOLD} connection requests')    
 
     except Exception as e:
         logging.error(f'Error processing packet: {e}')
