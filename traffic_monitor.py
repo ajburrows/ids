@@ -16,17 +16,17 @@ def get_ip():
         return f'Error: {e}'
 
 
-CONN_ATTEMPT_THRESHOLD=2
+CONN_ATTEMPT_THRESHOLD=2 # the maximum number of connection requests that can be made from an ip address
 LOG_FILE='traffic.log'
 CONN_ATTEMPTS_FILE="connection_attempts.json"
 IP=get_ip()
-TIMESTAMP_LIFETIME=5
+TIMESTAMP_LIFETIME=3
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 
 def get_timestamps():
     timestamp_val = datetime.now()
-    timestamp_str = timestamp_val.strftime('%Y-%m-%d %H:%M:%f')
+    timestamp_str = timestamp_val.strftime('%Y-%m-%d %H:%M:%S.%f')
 
     return timestamp_str, timestamp_val
 
@@ -39,12 +39,14 @@ def update_prev_conn_attempts(cur_time_str, cur_time_val, prev_attempts):
     """
     give_warning = False
     prev_attempts.append(cur_time_str)
-    first_timestamp = datetime.strptime(prev_attempts[0], "%Y-%m-%d %H:%M:%f")
-    print(f'cur_time_val: {cur_time_val}')
-    print(f'first_timestamp: {first_timestamp}')
-    while int(cur_time_val - first_timestamp) >= TIMESTAMP_LIFETIME:
+    first_timestamp = datetime.strptime(prev_attempts[0], "%Y-%m-%d %H:%M:%S.%f")
+    
+    # clear out all old timestamps
+    while len(prev_attempts) > 0:
+        time_delta = cur_time_val - first_timestamp
+        if time_delta.total_seconds() < TIMESTAMP_LIFETIME:
+            break
         prev_attempts.popleft()
-        datetime.strptime(prev_attempts[0], "%Y-%m-%d %H:%M:%f")
     
     if len(prev_attempts) > CONN_ATTEMPT_THRESHOLD:
         give_warning = True
