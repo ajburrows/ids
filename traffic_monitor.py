@@ -16,11 +16,11 @@ def get_ip():
         return f'Error: {e}'
 
 
-CONN_ATTEMPT_THRESHOLD=7 # the maximum number of connection requests that can be made from an ip address
+CONN_ATTEMPT_THRESHOLD=8 # the maximum number of connection requests that can be made from an ip address
 LOG_FILE='traffic.log'
 CONN_ATTEMPTS_FILE="connection_attempts.json"
 IP=get_ip()
-TIMESTAMP_LIFETIME=3
+TIMESTAMP_LIFETIME=1
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 
