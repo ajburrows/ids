@@ -16,7 +16,7 @@ def get_ip():
         return f'Error: {e}'
 
 
-CONN_ATTEMPT_THRESHOLD=2 # the maximum number of connection requests that can be made from an ip address
+CONN_ATTEMPT_THRESHOLD=7 # the maximum number of connection requests that can be made from an ip address
 LOG_FILE='traffic.log'
 CONN_ATTEMPTS_FILE="connection_attempts.json"
 IP=get_ip()
@@ -63,7 +63,8 @@ def log_packet(packet):
     src_port = packet[0][2].sport
     dst_port = packet[0][2].dport
 
-    if dst_ip != IP or src_port == 443:
+    #if dst_ip != IP or src_port == 443:
+    if dst_ip != IP:
         return
 
     log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
