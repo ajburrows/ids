@@ -9,12 +9,12 @@ DELAY = 0.1
 def attempt_connections():
     for attempt in range(NUM_ATTEMPTS):
         try:
-            print(f'Attempt {attempt+1}/{NUM_ATTEMPTS} to connect to {SERVER_IP}:{STARTING_PORT}...\n')
+            print(f'Attempt {attempt+1}/{NUM_ATTEMPTS} to connect to {SERVER_IP}:{STARTING_PORT+attempt}...\n')
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                client_socket.connect((SERVER_IP, STARTING_PORT))
-                print(f"Successfully connected on attempt {attempt}")
+                client_socket.connect((SERVER_IP, STARTING_PORT+attempt))
+                print(f"Successfully connected on attempt {attempt+1}")
         except Exception as e:
-            print(f'Attempt {attempt} failed: {e}')
+            print(f'Attempt {attempt+1} failed: {e}')
         time.sleep(DELAY)
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ def start_server():
                 client_socket, client_address = server_socket.accept()
                 message = "Hello from server!"
                 client_socket.sendall(message.encode('utf-8'))
+                print("said hello to someone :)")
                 client_socket.close()
 
             except KeyboardInterrupt:
