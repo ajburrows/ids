@@ -7,7 +7,30 @@ PASSWORD = 'pass'
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'server_data.txt')
 
 def handle_admin(admin_socket):
-    pass
+    admin_socket.send(b'Successfully logged in.')
+    while True:
+        admin_socket.send(b'Enter a command (edit / get data / exit / shut down): ')
+        user_input = admin_socket.recv(1024).decode().strip().lower()
+
+        if user_input == 'edit':
+            admin_socket.send(b'Enter new server data:\n')
+            new_data = admin_socket.recv(1024).decode().strip()
+
+            with open(DATA_FILE, 'w') as file:
+                file.write(new_data)
+            admin_socket.send(b'Data updated.\n')
+        
+        elif user_input == 'get data':
+            try:
+                with open(DATA_FILE, 'r') as file:
+                    data = file.read()
+                admin_socket.send(f'Data:\n{data}\n'.encode())
+            except FileNotFoundError:
+                admin_socket.send(b'Error: data file not found.\n')
+        elif user_input == 'exit':
+            break
+        else:
+            admin_socket.send(b'Invalid command. Try again.\n')
 
 def handle_client(client_socket):
     client_socket.send(b'You have connected to the server. What would you like to do? (get data / login / exit)\n')
