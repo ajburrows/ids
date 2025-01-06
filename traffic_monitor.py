@@ -51,53 +51,52 @@ def update_prev_conn_attempts(cur_time_str, cur_time_val, prev_attempts):
     if len(prev_attempts) > CONN_ATTEMPT_THRESHOLD:
         give_warning = True
     
-    return list(prev_attempts), give_warning
+    return list(prev_attempts), give_warning, len(prev_attempts)
 
 
 def log_packet(packet):
-    #try:
-    timestamp_str, timestamp_val = get_timestamps()
+    try:
+        timestamp_str, timestamp_val = get_timestamps()
 
-    src_ip = packet[0][1].src
-    dst_ip = packet[0][1].dst
-    src_port = packet[0][2].sport
-    dst_port = packet[0][2].dport
+        src_ip = packet[0][1].src
+        dst_ip = packet[0][1].dst
+        src_port = packet[0][2].sport
+        dst_port = packet[0][2].dport
+        if dst_ip != IP:
+        #if dst_ip != IP:
+            return
 
-    if dst_ip != IP or src_port == 443:
-    #if dst_ip != IP:
-        return
+        log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
+        print(log_entry)
+        logging.info(log_entry)
 
-    log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
-    print(log_entry)
-    logging.info(log_entry)
+        give_warning = False
+        conn_attempts_obj = {}
+        if os.path.exists(CONN_ATTEMPTS_FILE):
+            # load the current conn_attempts_obj
+            with open(CONN_ATTEMPTS_FILE, 'r') as file:
+                conn_attempts_obj = json.load(file)
 
-    give_warning = False
-    conn_attempts_obj = {}
-    if os.path.exists(CONN_ATTEMPTS_FILE):
-        # load the current conn_attempts_obj
-        with open(CONN_ATTEMPTS_FILE, 'r') as file:
-            conn_attempts_obj = json.load(file)
+        # up date the obj with the new log
+        if src_ip not in conn_attempts_obj:
+            conn_attempts_obj[src_ip] = [0, [timestamp_str]]
+        else:
+            conn_attempts_obj[src_ip][0] = conn_attempts_obj[src_ip][0]+1
+            prev_attempts = deque(conn_attempts_obj[src_ip][1])
+            new_attempts, give_warning, num_attempts = update_prev_conn_attempts(timestamp_str, timestamp_val, prev_attempts)
+            conn_attempts_obj[src_ip][1] = new_attempts
+            
+        with open(CONN_ATTEMPTS_FILE, 'w') as file:
+            json.dump(conn_attempts_obj, file)
 
-    # up date the obj with the new log
-    if src_ip not in conn_attempts_obj:
-        conn_attempts_obj[src_ip] = [0, [timestamp_str]]
-    else:
-        conn_attempts_obj[src_ip][0] = conn_attempts_obj[src_ip][0]+1
-        prev_attempts = deque(conn_attempts_obj[src_ip][1])
-        new_attempts, give_warning = update_prev_conn_attempts(timestamp_str, timestamp_val, prev_attempts)
-        conn_attempts_obj[src_ip][1] = new_attempts
-        
-    with open(CONN_ATTEMPTS_FILE, 'w') as file:
-        json.dump(conn_attempts_obj, file)
+        if give_warning:
+            logging.warning(f'WARNING: ip {src_ip} has sent {num_attempts} connection requests in the past {TIMESTAMP_LIFETIME} seconds')    
 
-    if give_warning:
-        logging.warning(f'WARNING: ip {src_ip} has sent more than {CONN_ATTEMPT_THRESHOLD} connection requests')    
-
-    #except Exception as e:
-    #    logging.error(f'Error processing packet: {e}')
+    except Exception as e:
+        logging.error(f'Error processing packet: {e}')
 
 def start_sniffing():
-    print('Starting packet sniffing on port 9999...')
+    print('Starting packet sniffing')
     sniff(filter='tcp', prn=log_packet, store=False)
 
 if __name__ == '__main__':
