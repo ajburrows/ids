@@ -5,7 +5,18 @@ HOST = '10.0.2.15'
 PORT = 443
 PASSWORD = 'pass'
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'server_data.txt')
+SERVER_RUNNING = True
 
+
+def read_data():
+    try:
+        data = ''
+        with open(DATA_FILE, 'r') as file:
+            data = file.read()
+        return data
+    except FileNotFoundError:
+        print('Error: data file does not exist.\n')
+    
 def handle_admin(admin_socket):
     admin_socket.send(b'Successfully logged in.')
     while True:
@@ -21,14 +32,17 @@ def handle_admin(admin_socket):
             admin_socket.send(b'Data updated.\n')
         
         elif user_input == 'get data':
-            try:
-                with open(DATA_FILE, 'r') as file:
-                    data = file.read()
-                admin_socket.send(f'Data:\n{data}\n'.encode())
-            except FileNotFoundError:
-                admin_socket.send(b'Error: data file not found.\n')
+            data = read_data()
+            admin_socket.send(f'Data:\n{data}\n'.encode())
+
         elif user_input == 'exit':
             break
+
+        elif user_input == 'shut down':
+            global SERVER_RUNNING
+            SERVER_RUNNING = False
+            break
+
         else:
             admin_socket.send(b'Invalid command. Try again.\n')
 
@@ -40,14 +54,10 @@ def handle_client(client_socket):
         user_input = client_socket.recv(1024).decode().strip().lower()
 
         if user_input == 'get data':
-            try:
-                with open(DATA_FILE, 'r') as file:
-                    data = file.read()
-                    client_socket.send(f'Data:\n{data}\n'.encode())
-                    break
-            except FileNotFoundError:
-                client_socket.close()
-                client_socket.send(b'Error: data file not found.\n')
+            data = read_data()
+            client_socket.send(f'Data:\n{data}\n'.encode())
+            break
+
         elif user_input == 'login':
             client_socket.send(b'Enter password: ')
             password_input = client_socket.recv(1024).decode().strip()
@@ -58,8 +68,10 @@ def handle_client(client_socket):
                 break
             else:
                 client_socket.send(b'Incorrect password.\n')
+
         elif user_input == 'exit':
             break
+
         else:
             client_socket.send(b'Invalid command. Try again.\n')
         
@@ -75,10 +87,17 @@ def main():
 
     print(f'Server is listening on {HOST}:{PORT}')
 
-    while True:
-        client_socket, addr = server.accept()
-        print(f'Accepted connection from {addr}')
-        handle_client(client_socket)
+    try:
+        while SERVER_RUNNING:
+            client_socket, addr = server.accept()
+            print(f'Accepted connection from {addr}')
+            handle_client(client_socket)
+            print(f'while down. running? {SERVER_RUNNING}')
+    except KeyboardInterrupt:
+        print(f'Error: Keyboard interrupt')
+    finally:    
+        print('Closing server...')
+        server.close()
 
 if __name__ == '__main__':
     main()
