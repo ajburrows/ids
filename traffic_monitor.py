@@ -10,6 +10,7 @@ import sql_config
 
 
 def get_ip():
+    """ Get the ip address of this machine. """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(('8.8.8.8', 80))
@@ -17,12 +18,14 @@ def get_ip():
     except Exception as e:
         return f'Error: {e}'
 
+
 IP=get_ip()
 CONN_ATTEMPT_THRESHOLD=150 # the maximum number of connection requests that can be made from an ip address
-TIMESTAMP_LIFETIME=1
-LOG_FILE='traffic.log'
-CONN_ATTEMPTS_FILE="connection_attempts.json"
+TIMESTAMP_LIFETIME=1 # number of seconds until a timestamp is removed from the CONN_ATTEMPTS_FILE
+LOG_FILE='traffic.log' # log file where network traffic is dumped
+CONN_ATTEMPTS_FILE="connection_attempts.json" # json object that tracks connection attempts from different ip addrs
 
+# Info to connect to the local MySQL database
 db_config = {
     'host': sql_config.DB_HOST,
     'user': sql_config.DB_USER,
@@ -30,10 +33,12 @@ db_config = {
     'database': sql_config.DB_NAME
 }
 
+# set config of the log file
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 
 def get_timestamps():
+    """ Get the current timestamp. Note timestamp_val is a datetime object. """
     timestamp_val = datetime.now()
     timestamp_str = timestamp_val.strftime('%Y-%m-%d %H:%M:%S.%f')
 
@@ -62,6 +67,7 @@ def update_prev_conn_attempts(cur_time_str, cur_time_val, prev_attempts):
     
     return list(prev_attempts), give_warning, len(prev_attempts)
 
+
 def insert_log_entry(conn, cursor, timestamp, source_ip, source_port, dest_ip, dest_port):
     insert_query = """
     INSERT INTO traffic_logs (timestamp, source_ip, source_port, dest_ip, dest_port)
@@ -72,8 +78,9 @@ def insert_log_entry(conn, cursor, timestamp, source_ip, source_port, dest_ip, d
 
 def log_packet(packet):
     try:
-        timestamp_str, timestamp_val = get_timestamps()
 
+        # Get data to record the packet
+        timestamp_str, timestamp_val = get_timestamps()
         src_ip = packet[0][1].src
         dst_ip = packet[0][1].dst
         src_port = packet[0][2].sport
@@ -83,9 +90,14 @@ def log_packet(packet):
 
         log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
         print(log_entry)
+
+        # add the log_entry to the traffic.log file
         logging.info(log_entry)
+
+        # insert the log entry into the database
         insert_log_entry(conn, cursor, timestamp_str, src_ip, src_port, dst_ip, dst_port)
 
+        # Update the connection_attempts object with the new packet
         give_warning = False
         conn_attempts_obj = {}
         if os.path.exists(CONN_ATTEMPTS_FILE):
@@ -93,7 +105,7 @@ def log_packet(packet):
             with open(CONN_ATTEMPTS_FILE, 'r') as file:
                 conn_attempts_obj = json.load(file)
 
-        # up date the obj with the new log
+        # update the obj with the new log
         if src_ip not in conn_attempts_obj:
             conn_attempts_obj[src_ip] = [0, [timestamp_str]]
         else:
@@ -105,15 +117,19 @@ def log_packet(packet):
         with open(CONN_ATTEMPTS_FILE, 'w') as file:
             json.dump(conn_attempts_obj, file)
 
+        # Log a warning if the source has sent a suspicious amount of traffic
         if give_warning:
             logging.warning(f'WARNING: ip {src_ip} has sent {num_attempts} connection requests in the past {TIMESTAMP_LIFETIME} seconds')    
 
     except Exception as e:
         logging.error(f'Error processing packet: {e}')
 
+
 def start_sniffing():
+    """ Record tcp traffic as it comes into this machine. """
     print('Starting packet sniffing')
     sniff(filter='tcp', prn=log_packet, store=False)
+
 
 if __name__ == '__main__':
     try:
