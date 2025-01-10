@@ -5,6 +5,8 @@ import logging
 import socket
 import json
 import os
+import mysql.connector
+import sql_config
 
 
 def get_ip():
@@ -15,12 +17,19 @@ def get_ip():
     except Exception as e:
         return f'Error: {e}'
 
-
-CONN_ATTEMPT_THRESHOLD=8 # the maximum number of connection requests that can be made from an ip address
+IP=get_ip()
+CONN_ATTEMPT_THRESHOLD=150 # the maximum number of connection requests that can be made from an ip address
+TIMESTAMP_LIFETIME=1
 LOG_FILE='traffic.log'
 CONN_ATTEMPTS_FILE="connection_attempts.json"
-IP=get_ip()
-TIMESTAMP_LIFETIME=1
+
+db_config = {
+    'host': sql_config.DB_HOST,
+    'user': sql_config.DB_USER,
+    'password': sql_config.DB_PASSWORD,
+    'database': sql_config.DB_NAME
+}
+
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(message)s')
 
 
@@ -53,6 +62,13 @@ def update_prev_conn_attempts(cur_time_str, cur_time_val, prev_attempts):
     
     return list(prev_attempts), give_warning, len(prev_attempts)
 
+def insert_log_entry(conn, cursor, timestamp, source_ip, source_port, dest_ip, dest_port):
+    insert_query = """
+    INSERT INTO traffic_logs (timestamp, source_ip, source_port, dest_ip, dest_port)
+    VALUES (%s, %s, %s, %s, %s)
+    """
+    cursor.execute(insert_query, (timestamp, source_ip, source_port, dest_ip, dest_port))
+    conn.commit()
 
 def log_packet(packet):
     try:
@@ -63,12 +79,12 @@ def log_packet(packet):
         src_port = packet[0][2].sport
         dst_port = packet[0][2].dport
         if dst_ip != IP:
-        #if dst_ip != IP:
             return
 
         log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
         print(log_entry)
         logging.info(log_entry)
+        insert_log_entry(conn, cursor, timestamp_str, src_ip, src_port, dst_ip, dst_port)
 
         give_warning = False
         conn_attempts_obj = {}
@@ -100,4 +116,14 @@ def start_sniffing():
     sniff(filter='tcp', prn=log_packet, store=False)
 
 if __name__ == '__main__':
-    start_sniffing()
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        start_sniffing()
+    except mysql.connector.Error as e:
+        print(f'Error: {e}')
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+            print('MySQL connection closed.')

@@ -18,14 +18,15 @@ def read_data():
         print('Error: data file does not exist.\n')
     
 def handle_admin(admin_socket):
-    admin_socket.send(b'Successfully logged in.')
     while True:
         admin_socket.send(b'Enter a command (edit / get data / exit / shut down): ')
         user_input = admin_socket.recv(1024).decode().strip().lower()
+        admin_socket.send(b'\n')
 
         if user_input == 'edit':
             admin_socket.send(b'Enter new server data:\n')
             new_data = admin_socket.recv(1024).decode().strip()
+            admin_socket.send(b'\n')
 
             with open(DATA_FILE, 'w') as file:
                 file.write(new_data)
@@ -33,7 +34,7 @@ def handle_admin(admin_socket):
         
         elif user_input == 'get data':
             data = read_data()
-            admin_socket.send(f'Data:\n{data}\n'.encode())
+            admin_socket.send(f'Data:\n{data}\n\n'.encode())
 
         elif user_input == 'exit':
             break
@@ -47,20 +48,22 @@ def handle_admin(admin_socket):
             admin_socket.send(b'Invalid command. Try again.\n')
 
 def handle_client(client_socket):
-    client_socket.send(b'You have connected to the server. What would you like to do? (get data / login / exit)\n')
+    client_socket.send(b'You have connected to the server.\nEnter a command (get data / login / exit): ')
     logged_in = False
 
     while True:
         user_input = client_socket.recv(1024).decode().strip().lower()
+        client_socket.send(b'\n')
 
         if user_input == 'get data':
             data = read_data()
-            client_socket.send(f'Data:\n{data}\n'.encode())
+            client_socket.send(f'Data:\n{data}\n\n'.encode())
             break
 
         elif user_input == 'login':
             client_socket.send(b'Enter password: ')
             password_input = client_socket.recv(1024).decode().strip()
+            client_socket.send(b'\n')
 
             if password_input == PASSWORD:
                 client_socket.send(b'Login successful. You can now use the "edit" command.\n')

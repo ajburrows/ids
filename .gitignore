@@ -1,6 +1,9 @@
+venv
 connection_attempts.json
 traffic.log
 testing.py
 notes.txt
 server/testing_server.py
 server/server_data.txt
+sql_config.py
+__pycache__/sql_config.cpython-312.pyc
