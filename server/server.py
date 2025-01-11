@@ -18,6 +18,7 @@ def read_data():
     except FileNotFoundError:
         print('Error: data file does not exist.\n')
     
+
 def handle_admin(admin_socket):
     """ Handle commands with admin level privileges """
     while True:
@@ -52,6 +53,7 @@ def handle_admin(admin_socket):
 
         else:
             admin_socket.send(b'Invalid command. Try again.\n')
+
 
 def handle_client(client_socket):
     """ Handle commands with client-level privileges """
@@ -107,7 +109,6 @@ def main():
             client_socket, addr = server.accept()
             print(f'Accepted connection from {addr}')
             handle_client(client_socket)
-            print(f'while down. running? {SERVER_RUNNING}')
     except KeyboardInterrupt:
         print(f'Error: Keyboard interrupt')
     finally:    

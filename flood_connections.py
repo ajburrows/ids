@@ -6,6 +6,7 @@ STARTING_PORT = 9990
 NUM_ATTEMPTS = 10
 DELAY = 0.1
 
+# attempt to rapidly connect to various ports on the given ip address.
 def attempt_connections():
     for attempt in range(NUM_ATTEMPTS):
         try:
@@ -18,4 +19,5 @@ def attempt_connections():
         time.sleep(DELAY)
 
 if __name__ == "__main__":
+    print("NOTE: it is better to simply use nmap instead of flood_connections.py")
     attempt_connections()

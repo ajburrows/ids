@@ -1,6 +1,6 @@
 from datetime import datetime
 from collections import deque
-from scapy.all import sniff
+from scapy.all import sniff, TCP, Raw
 import logging
 import socket
 import json
@@ -68,58 +68,66 @@ def update_prev_conn_attempts(cur_time_str, cur_time_val, prev_attempts):
     return list(prev_attempts), give_warning, len(prev_attempts)
 
 
-def insert_log_entry(conn, cursor, timestamp, source_ip, source_port, dest_ip, dest_port):
+def insert_log_entry(conn, cursor, timestamp, source_ip, source_port, dest_ip, dest_port, payload):
     insert_query = """
-    INSERT INTO traffic_logs (timestamp, source_ip, source_port, dest_ip, dest_port)
-    VALUES (%s, %s, %s, %s, %s)
+    INSERT INTO traffic_logs (timestamp, source_ip, source_port, dest_ip, dest_port, payload)
+    VALUES (%s, %s, %s, %s, %s, %s)
     """
-    cursor.execute(insert_query, (timestamp, source_ip, source_port, dest_ip, dest_port))
+    payload = 'Null' if payload is None else payload
+    cursor.execute(insert_query, (timestamp, source_ip, source_port, dest_ip, dest_port, payload))
     conn.commit()
+
+
+def check_activity(timestamp_str, timestamp_val, src_ip):
+    # Update the connection_attempts object with the new packet
+    give_warning = False
+    conn_attempts_obj = {}
+    if os.path.exists(CONN_ATTEMPTS_FILE):
+        # load the current conn_attempts_obj
+        with open(CONN_ATTEMPTS_FILE, 'r') as file:
+            conn_attempts_obj = json.load(file)
+
+    # update the obj with the new log
+    if src_ip not in conn_attempts_obj:
+        conn_attempts_obj[src_ip] = [0, [timestamp_str]]
+    else:
+        conn_attempts_obj[src_ip][0] = conn_attempts_obj[src_ip][0]+1
+        prev_attempts = deque(conn_attempts_obj[src_ip][1])
+        new_attempts, give_warning, num_attempts = update_prev_conn_attempts(timestamp_str, timestamp_val, prev_attempts)
+        conn_attempts_obj[src_ip][1] = new_attempts
+        
+    with open(CONN_ATTEMPTS_FILE, 'w') as file:
+        json.dump(conn_attempts_obj, file)
+
+    # Log a warning if the source has sent a suspicious amount of traffic
+    if give_warning:
+        logging.warning(f'WARNING: ip {src_ip} has sent {num_attempts} connection requests in the past {TIMESTAMP_LIFETIME} seconds')    
+
 
 def log_packet(packet):
     try:
-
         # Get data to record the packet
-        timestamp_str, timestamp_val = get_timestamps()
-        src_ip = packet[0][1].src
         dst_ip = packet[0][1].dst
-        src_port = packet[0][2].sport
-        dst_port = packet[0][2].dport
+        src_ip = packet[0][1].src
         if dst_ip != IP:
             return
+        src_port = packet[0][2].sport
+        dst_port = packet[0][2].dport
+        timestamp_str, timestamp_val = get_timestamps()
+        payload = packet['Raw'].load.decode('utf-8', errors='ignore') if packet.haslayer(Raw) else None
+        print(f'payload: {payload}')
 
-        log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}'
+
+        log_entry = f'[{timestamp_str}] Traffic: {src_ip}:{src_port} -> {dst_ip}:{dst_port}. Payload: {'Null' if payload is None else payload}'
         print(log_entry)
 
         # add the log_entry to the traffic.log file
         logging.info(log_entry)
 
         # insert the log entry into the database
-        insert_log_entry(conn, cursor, timestamp_str, src_ip, src_port, dst_ip, dst_port)
+        insert_log_entry(conn, cursor, timestamp_str, src_ip, src_port, dst_ip, dst_port, payload)
 
-        # Update the connection_attempts object with the new packet
-        give_warning = False
-        conn_attempts_obj = {}
-        if os.path.exists(CONN_ATTEMPTS_FILE):
-            # load the current conn_attempts_obj
-            with open(CONN_ATTEMPTS_FILE, 'r') as file:
-                conn_attempts_obj = json.load(file)
-
-        # update the obj with the new log
-        if src_ip not in conn_attempts_obj:
-            conn_attempts_obj[src_ip] = [0, [timestamp_str]]
-        else:
-            conn_attempts_obj[src_ip][0] = conn_attempts_obj[src_ip][0]+1
-            prev_attempts = deque(conn_attempts_obj[src_ip][1])
-            new_attempts, give_warning, num_attempts = update_prev_conn_attempts(timestamp_str, timestamp_val, prev_attempts)
-            conn_attempts_obj[src_ip][1] = new_attempts
-            
-        with open(CONN_ATTEMPTS_FILE, 'w') as file:
-            json.dump(conn_attempts_obj, file)
-
-        # Log a warning if the source has sent a suspicious amount of traffic
-        if give_warning:
-            logging.warning(f'WARNING: ip {src_ip} has sent {num_attempts} connection requests in the past {TIMESTAMP_LIFETIME} seconds')    
+        check_activity(timestamp_str, timestamp_val, src_ip)
 
     except Exception as e:
         logging.error(f'Error processing packet: {e}')

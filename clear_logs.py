@@ -10,6 +10,7 @@ db_config = {
     'database': sql_config.DB_NAME
 }
 
+# delete all entries in the traffic_db table in the local MySQL database.
 def clear_table():
     try:
         conn = mysql.connector.connect(**db_config)
@@ -27,6 +28,7 @@ def clear_table():
             conn.close()
             print('MySQL connection closed.')
 
+# delete all entries in traffic.log
 def clear_log_file():
     try:
         with open(LOG_FILE_PATH, 'w') as file:
